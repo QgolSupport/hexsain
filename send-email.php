@@ -1,141 +1,138 @@
 <?php
-require "C:/xampp/htdocs/qgol/vendor/autoload.php";
+declare(strict_types=1);
 
-use PHPMailer\PHPMailer\PHPMailer;
-use PHPMailer\PHPMailer\SMTP;
+const HEXSA_INQUIRY_RECIPIENT = 'marketing.hexsa@gmail.com';
+const HEXSA_INQUIRY_SENDER = 'website@hexsa.in';
 
-if ($_SERVER["REQUEST_METHOD"] == "POST") 
+function redirectToForm(string $status, string $form): never
 {
-
-    // Honeypot check
-    if (!empty($_POST['website'])) {
-        die("Spam detected!");
-    }
-
-    // reCAPTCHA verification
-    $secretKey = "6LdrKGorAAAAAGwLs3Os5Kl__dpnhbiydWuNO_Z1"; // Replace with your actual secret key
-    $response = $_POST['g-recaptcha-response'] ?? '';
-    $ip = $_SERVER['3.111.37.58'];
-    $url = "https://www.google.com/recaptcha/api/siteverify?secret=$secretKey&response=$response&remoteip=$ip";
-    $recaptcha = json_decode(file_get_contents($url));
-
-    if (!$recaptcha->success) {
-        die("CAPTCHA verification failed!");
-    }
-
-
-
-    // Validate and sanitize inputs
-    $company = htmlspecialchars($_POST['company'] ?? 'N/A');
-    $name = htmlspecialchars($_POST['name'] ?? '');
-    $email = filter_var($_POST['email'] ?? '', FILTER_SANITIZE_EMAIL);
-    $phone = htmlspecialchars($_POST['phone'] ?? '');
-    $product = htmlspecialchars($_POST['product'] ?? '');
-    $quantity = htmlspecialchars($_POST['quantity'] ?? '');
-    $urgency = htmlspecialchars($_POST['urgency'] ?? '');
-    $specs = htmlspecialchars($_POST['specs'] ?? '');
-	$msg = htmlspecialchars($_POST['message'] ?? '');
-
-    // Basic validation
-    if (empty($company) || empty($name) || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        die("Error: Required fields are missing or invalid.");
-    }
-
-    // Email content
-	if($company == 'N/A')
-	{
-        $message = "
-		<html>
-		<head>
-			<title>Enquiry</title>
-			<style>
-				body { font-family: Arial, sans-serif; line-height: 1.6; }
-				.header { color: #2E7D32; font-size: 24px; margin-bottom: 20px; }
-				.detail { margin-bottom: 10px; }
-				.label { font-weight: bold; color: #333; }
-			</style>
-		</head>
-		<body>			
-			<div class='detail'><span class='label'>Contact Person:</span> $name</div>
-			<div class='detail'><span class='label'>Email:</span> $email</div>
-			<div class='detail'><span class='label'>Phone:</span> $phone</div>
-			<div class='detail'><span class='label'>Message:</span> $msg</div>			
-			<div style='margin-top: 30px;'>
-				<p>This message was submitted from the hexsa website.</p>
-			</div>
-		</body>
-		</html>
-		";
-    		
-	}
-	else
-	{
-		$message = "
-		<html>
-		<head>
-			<title>New Quote Request</title>
-			<style>
-				body { font-family: Arial, sans-serif; line-height: 1.6; }
-				.header { color: #2E7D32; font-size: 24px; margin-bottom: 20px; }
-				.detail { margin-bottom: 10px; }
-				.label { font-weight: bold; color: #333; }
-			</style>
-		</head>
-		<body>
-			<div class='header'>New Quote Request</div>
-			
-			<div class='detail'><span class='label'>Company:</span> $company</div>
-			<div class='detail'><span class='label'>Contact Person:</span> $name</div>
-			<div class='detail'><span class='label'>Email:</span> $email</div>
-			<div class='detail'><span class='label'>Phone:</span> $phone</div>
-			<div class='detail'><span class='label'>Product Interest:</span> $product</div>
-			<div class='detail'><span class='label'>Estimated Quantity:</span> $quantity</div>
-			<div class='detail'><span class='label'>Urgency:</span> $urgency</div>
-			<div class='detail'><span class='label'>Special Requirements:</span><br>$specs</div>
-			
-			<div style='margin-top: 30px;'>
-				<p>This request was submitted from the hexsa website.</p>
-			</div>
-		</body>
-		</html>
-		";
-    }
-    try {
-        // Configure PHPMailer
-        $mail = new PHPMailer(true);
-        $mail->isSMTP();
-        $mail->Host = 'smtp.gmail.com';
-        $mail->Port = 465;
-        $mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS;
-        $mail->SMTPAuth = true;
-        $mail->Username = 'support@qgol.in'; // Your Gmail
-        $mail->Password = 'iyubnktonitmegxu'; // Use app password if 2FA is enabled
-
-        // Recipients
-        $mail->setFrom('marketing.hexsa@gmail.com', 'HexsaMarketing');
-        //$mail->addAddress('sathish@qgol.in'); // Recipient
-		$mail->addAddress('marketing.hexsa@gmail.com'); // Recipient
-        $mail->addReplyTo($email, $name); // Customer's email for replies
-
-        // Content
-        $mail->isHTML(true);
-		if($company == 'N/A')
-        {
-           $mail->Subject = "New Product Enquiry";
-        }			
-        else $mail->Subject = "New RFQ from $company";
-        $mail->Body = $message;
-        $mail->AltBody = strip_tags($message); // Plain-text fallback
-
-        $mail->send();
-        header("Location: https://hexsa.in");
-        exit();
-    } catch (Exception $e) {
-        error_log("Email sending failed: " . $mail->ErrorInfo);
-        die("Error: Unable to send email. Please try again later.");
-    }
-} else {
-    header("Location: https://hexsa.in");
-    exit();
+    $anchor = $form === 'quote' ? 'rfq' : 'contact';
+    header('Location: https://hexsa.in/?inquiry=' . rawurlencode($status) . '&form=' . rawurlencode($form) . '#' . $anchor);
+    exit;
 }
-?>
+
+function cleanText(mixed $value, int $limit = 500): string
+{
+    $text = trim((string) $value);
+    $text = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', '', $text) ?? '';
+
+    return mb_substr($text, 0, $limit);
+}
+
+function escapeHtml(string $value): string
+{
+    return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+}
+
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    header('Location: https://hexsa.in');
+    exit;
+}
+
+$isQuote = array_key_exists('company', $_POST);
+$form = $isQuote ? 'quote' : 'contact';
+
+// Keep automated submissions out without relying on an external CAPTCHA service.
+if (!empty($_POST['website'])) {
+    redirectToForm('sent', $form);
+}
+
+session_start();
+$now = time();
+$lastSubmission = (int) ($_SESSION['hexsa_last_inquiry'] ?? 0);
+if ($lastSubmission > 0 && ($now - $lastSubmission) < 15) {
+    redirectToForm('rate-limited', $form);
+}
+
+$company = cleanText($_POST['company'] ?? '', 150);
+$name = cleanText($_POST['name'] ?? '', 120);
+$email = filter_var(trim((string) ($_POST['email'] ?? '')), FILTER_SANITIZE_EMAIL);
+$phone = cleanText($_POST['phone'] ?? '', 40);
+$product = cleanText($_POST['product'] ?? '', 100);
+$quantity = cleanText($_POST['quantity'] ?? '', 100);
+$urgency = cleanText($_POST['urgency'] ?? '', 100);
+$specs = cleanText($_POST['specs'] ?? '', 3000);
+$customerMessage = cleanText($_POST['message'] ?? '', 3000);
+
+$validEmail = filter_var($email, FILTER_VALIDATE_EMAIL) !== false;
+$validCommonFields = mb_strlen($name) >= 2 && $validEmail && mb_strlen($phone) >= 7;
+$validQuote = !$isQuote || ($company !== '' && $product !== '' && $quantity !== '');
+$validContact = $isQuote || mb_strlen($customerMessage) >= 10;
+
+if (!$validCommonFields || !$validQuote || !$validContact) {
+    redirectToForm('invalid', $form);
+}
+
+$safeName = escapeHtml($name);
+$safeEmail = escapeHtml($email);
+$safePhone = escapeHtml($phone);
+
+if ($isQuote) {
+    $safeCompany = escapeHtml($company);
+    $safeProduct = escapeHtml($product);
+    $safeQuantity = escapeHtml($quantity);
+    $safeUrgency = escapeHtml($urgency);
+    $safeSpecs = nl2br(escapeHtml($specs));
+    $subjectCompany = preg_replace('/[\r\n]+/', ' ', $company) ?? 'Website inquiry';
+    $subject = 'New RFQ from ' . $subjectCompany;
+    $message = <<<HTML
+<!doctype html>
+<html lang="en">
+<head><meta charset="UTF-8"><title>New Quote Request</title></head>
+<body style="font-family:Arial,sans-serif;line-height:1.6;color:#222">
+    <h2 style="color:#2E7D32">New Quote Request</h2>
+    <p><strong>Company:</strong> {$safeCompany}</p>
+    <p><strong>Contact person:</strong> {$safeName}</p>
+    <p><strong>Email:</strong> {$safeEmail}</p>
+    <p><strong>Phone:</strong> {$safePhone}</p>
+    <p><strong>Product interest:</strong> {$safeProduct}</p>
+    <p><strong>Estimated quantity:</strong> {$safeQuantity}</p>
+    <p><strong>Urgency:</strong> {$safeUrgency}</p>
+    <p><strong>Special requirements:</strong><br>{$safeSpecs}</p>
+    <p style="margin-top:30px;color:#666">Submitted from the Hexsa website.</p>
+</body>
+</html>
+HTML;
+} else {
+    $safeCustomerMessage = nl2br(escapeHtml($customerMessage));
+    $subject = 'New Product Enquiry';
+    $message = <<<HTML
+<!doctype html>
+<html lang="en">
+<head><meta charset="UTF-8"><title>New Product Enquiry</title></head>
+<body style="font-family:Arial,sans-serif;line-height:1.6;color:#222">
+    <h2 style="color:#2E7D32">New Product Enquiry</h2>
+    <p><strong>Contact person:</strong> {$safeName}</p>
+    <p><strong>Email:</strong> {$safeEmail}</p>
+    <p><strong>Phone:</strong> {$safePhone}</p>
+    <p><strong>Message:</strong><br>{$safeCustomerMessage}</p>
+    <p style="margin-top:30px;color:#666">Submitted from the Hexsa website.</p>
+</body>
+</html>
+HTML;
+}
+
+$replyToName = preg_replace('/[\r\n]+/', ' ', $name) ?? 'Website visitor';
+$headers = [
+    'MIME-Version: 1.0',
+    'Content-Type: text/html; charset=UTF-8',
+    'From: Hexsa Website <' . HEXSA_INQUIRY_SENDER . '>',
+    'Reply-To: ' . $replyToName . ' <' . $email . '>',
+    'X-Mailer: PHP/' . PHP_VERSION,
+];
+
+$sent = mail(
+    HEXSA_INQUIRY_RECIPIENT,
+    $subject,
+    $message,
+    implode("\r\n", $headers),
+    '-f' . HEXSA_INQUIRY_SENDER
+);
+
+if (!$sent) {
+    error_log('Hexsa inquiry mail was rejected by the local mail transport.');
+    redirectToForm('error', $form);
+}
+
+$_SESSION['hexsa_last_inquiry'] = $now;
+redirectToForm('sent', $form);
