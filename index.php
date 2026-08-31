@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Safe Corrugated Containers</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script src="https://www.google.com/recaptcha/api.js" async defer></script>
     <style>
         /* ===== Global Styles ===== */
 		
@@ -880,6 +879,10 @@
                 <div class="rfq-form">
                     <h3>RFQ Form</h3>
                     <form id="quoteForm" action="send-email.php" method="POST">
+						<div class="hidden" aria-hidden="true">
+							<label for="quoteWebsite">Leave this empty:</label>
+							<input type="text" id="quoteWebsite" name="website" tabindex="-1" autocomplete="off">
+						</div>
                         <div class="form-row">
                             <div class="form-group">
                                 <label for="company">Company Name*</label>
@@ -943,10 +946,6 @@
                             <textarea id="specs" name="specs" placeholder="Dimensions, materials, printing, etc."></textarea>
                         </div>
 						
-						<!-- reCAPTCHA v2 -->
-						<div class="g-recaptcha" data-sitekey="6LdrKGorAAAAAG5TcOHUZ-1TeDlOV_pDwPYpdBtw"></div>
-						<span id="captchaError" class="error"></span>
-                        
                         <div class="form-submit">
                             <button type="submit" class="btn">Request Quote</button>
                         </div>
@@ -1056,10 +1055,6 @@
 							<span id="messageError" class="error"></span>
 						</div>
 
-						<!-- reCAPTCHA v2 -->
-						<div class="g-recaptcha" data-sitekey="6LdrKGorAAAAAG5TcOHUZ-1TeDlOV_pDwPYpdBtw"></div>
-						<span id="captchaError" class="error"></span>
-						
 						<button type="submit" class="btn">Send Message</button>
 						
                        <!-- <input type="text" name="name" placeholder="Your Name" required>
@@ -1173,8 +1168,6 @@
 
         // Form submission handling
         document.getElementById('quoteForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-            
             // Form validation
             const requiredFields = this.querySelectorAll('[required]');
             let isValid = true;
@@ -1188,17 +1181,26 @@
                 }
             });
             
-            if (isValid) {
-                // In a real implementation, this would be an AJAX call
-                this.submit();
-                
-                // Show confirmation
-                alert('Thank you! Your quote request has been submitted. Our team will contact you within 24 hours.');
-                this.reset();
-            } else {
+            if (!isValid) {
+                e.preventDefault();
                 alert('Please fill in all required fields.');
             }
         });
+
+		const inquiryStatus = new URLSearchParams(window.location.search).get('inquiry');
+		if (inquiryStatus === 'sent') {
+			alert('Thank you. Your inquiry has been sent successfully.');
+		} else if (inquiryStatus === 'invalid') {
+			alert('Please check the required details and submit the form again.');
+		} else if (inquiryStatus === 'rate-limited') {
+			alert('Please wait a few seconds before sending another inquiry.');
+		} else if (inquiryStatus === 'error') {
+			alert('We could not send your inquiry right now. Please try again shortly.');
+		}
+
+		if (inquiryStatus) {
+			window.history.replaceState({}, document.title, window.location.pathname + window.location.hash);
+		}
 		
 		
 		document.getElementById('contactForm').addEventListener('submit', function(e) 
@@ -1234,12 +1236,6 @@
 				document.getElementById('phoneError').textContent =  'Invalid phone number (must be at least 10 digits)';
 				isValid = false;
 			}
-
-            // reCAPTCHA check (requires server-side verification)
-          /*  if (!grecaptcha.getResponse()) {
-                document.getElementById('captchaError').textContent = 'Please complete CAPTCHA';
-                isValid = false;
-            }*/
 
             if (!isValid) e.preventDefault(); // Stop form submission
         });
