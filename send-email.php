@@ -24,6 +24,68 @@ function escapeHtml(string $value): string
     return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 }
 
+function sendViaLocalMta(string $recipient, string $subject, string $html, string $replyToName, string $replyToEmail): bool
+{
+    if (!function_exists('proc_open')) {
+        error_log('Hexsa inquiry mail transport is unavailable in PHP.');
+        return false;
+    }
+
+    $encodedSubject = mb_encode_mimeheader($subject, 'UTF-8', 'B', "\r\n");
+    $messageId = '<' . bin2hex(random_bytes(16)) . '@hexsa.in>';
+    $safeReplyToName = preg_replace('/[\r\n]+/', ' ', $replyToName) ?? 'Website visitor';
+    $rawMessage = implode("\r\n", [
+        'Date: ' . date(DATE_RFC2822),
+        'Message-ID: ' . $messageId,
+        'From: Hexsa Website <' . HEXSA_INQUIRY_SENDER . '>',
+        'To: ' . $recipient,
+        'Reply-To: ' . $safeReplyToName . ' <' . $replyToEmail . '>',
+        'Subject: ' . $encodedSubject,
+        'MIME-Version: 1.0',
+        'Content-Type: text/html; charset=UTF-8',
+        'Content-Transfer-Encoding: 8bit',
+        '',
+        $html,
+        '',
+    ]);
+
+    $command = [
+        '/usr/sbin/sendmail',
+        '-Am',
+        '-odi',
+        '-t',
+        '-i',
+        '-f' . HEXSA_INQUIRY_SENDER,
+    ];
+    $descriptors = [
+        0 => ['pipe', 'r'],
+        1 => ['pipe', 'w'],
+        2 => ['pipe', 'w'],
+    ];
+    $pipes = [];
+    $process = proc_open($command, $descriptors, $pipes);
+
+    if (!is_resource($process)) {
+        error_log('Hexsa inquiry mail transport could not be started.');
+        return false;
+    }
+
+    fwrite($pipes[0], $rawMessage);
+    fclose($pipes[0]);
+    $output = stream_get_contents($pipes[1]);
+    fclose($pipes[1]);
+    $errorOutput = stream_get_contents($pipes[2]);
+    fclose($pipes[2]);
+    $exitCode = proc_close($process);
+
+    if ($exitCode !== 0) {
+        error_log('Hexsa inquiry direct delivery failed: ' . trim($errorOutput . ' ' . $output));
+        return false;
+    }
+
+    return true;
+}
+
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     header('Location: https://hexsa.in');
     exit;
@@ -112,25 +174,15 @@ HTML;
 HTML;
 }
 
-$replyToName = preg_replace('/[\r\n]+/', ' ', $name) ?? 'Website visitor';
-$headers = [
-    'MIME-Version: 1.0',
-    'Content-Type: text/html; charset=UTF-8',
-    'From: Hexsa Website <' . HEXSA_INQUIRY_SENDER . '>',
-    'Reply-To: ' . $replyToName . ' <' . $email . '>',
-    'X-Mailer: PHP/' . PHP_VERSION,
-];
-
-$sent = mail(
+$sent = sendViaLocalMta(
     HEXSA_INQUIRY_RECIPIENT,
     $subject,
     $message,
-    implode("\r\n", $headers),
-    '-f' . HEXSA_INQUIRY_SENDER
+    $name,
+    $email
 );
 
 if (!$sent) {
-    error_log('Hexsa inquiry mail was rejected by the local mail transport.');
     redirectToForm('error', $form);
 }
 
