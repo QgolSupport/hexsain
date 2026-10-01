@@ -1,3 +1,25 @@
+<?php
+declare(strict_types=1);
+require __DIR__ . '/inquiry-protection.php';
+hexsaStartSession();
+$inquiryFlash = hexsaTakeInquiryFlash();
+$quoteCaptcha = hexsaCreateCaptcha('quote');
+$contactCaptcha = hexsaCreateCaptcha('contact');
+$quoteSubmitted = ($inquiryFlash['form'] ?? '') === 'quote' && ($inquiryFlash['status'] ?? '') === 'sent';
+$contactSubmitted = ($inquiryFlash['form'] ?? '') === 'contact' && ($inquiryFlash['status'] ?? '') === 'sent';
+
+function inquiryValue(string $form, string $field): string
+{
+    global $inquiryFlash;
+    $value = ($inquiryFlash['form'] ?? '') === $form ? ($inquiryFlash['values'][$field] ?? '') : '';
+    return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+}
+
+function inquirySelected(string $field, string $value): string
+{
+    return inquiryValue('quote', $field) === $value ? ' selected' : '';
+}
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -407,6 +429,28 @@
         .form-submit {
             text-align: center;
         }
+
+        .inquiry-status {
+            margin-bottom: 20px;
+            padding: 14px 16px;
+            border-radius: 4px;
+            background: #e8f5e9;
+            color: #1b5e20;
+            border: 1px solid #a5d6a7;
+        }
+
+        .inquiry-status[data-status]:not([data-status="sent"]) {
+            background: #fff3e0;
+            color: #7a3c00;
+            border-color: #ffcc80;
+        }
+
+        .inquiry-status[hidden] { display: none; }
+        .btn:disabled { opacity: 0.75; cursor: default; transform: none; }
+        .captcha-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 10px; }
+        .captcha-image { width: 220px; height: 64px; max-width: 100%; border: 1px solid #a5d6a7; border-radius: 4px; }
+        .captcha-refresh { padding: 6px 0; border: 0; background: none; color: #1b5e20; text-decoration: underline; font-size: 1rem; cursor: pointer; }
+        .captcha-help { display: block; margin-top: 6px; font-size: 0.875rem; }
 
         /* ===== About Section ===== */
         .about {
@@ -878,7 +922,8 @@
                 
                 <div class="rfq-form">
                     <h3>RFQ Form</h3>
-                    <form id="quoteForm" action="send-email.php" method="POST">
+                    <form id="quoteForm" action="send-email.php" method="POST" data-inquiry-form="quote">
+                        <div class="inquiry-status" role="<?= $quoteSubmitted ? 'status' : 'alert' ?>" aria-live="polite" tabindex="-1" data-status="<?= ($inquiryFlash['form'] ?? '') === 'quote' ? htmlspecialchars($inquiryFlash['status'] ?? '', ENT_QUOTES, 'UTF-8') : '' ?>" <?= hexsaInquiryMessage($inquiryFlash, 'quote') === '' ? 'hidden' : '' ?>><?= hexsaInquiryMessage($inquiryFlash, 'quote') ?></div>
 						<div class="hidden" aria-hidden="true">
 							<label for="quoteWebsite">Leave this empty:</label>
 							<input type="text" id="quoteWebsite" name="website" tabindex="-1" autocomplete="off">
@@ -886,22 +931,22 @@
                         <div class="form-row">
                             <div class="form-group">
                                 <label for="company">Company Name*</label>
-                                <input type="text" id="company" name="company" required>
+                                <input type="text" id="company" name="company" value="<?= inquiryValue('quote', 'company') ?>" required>
                             </div>
                             <div class="form-group">
-                                <label for="name">Contact Person*</label>
-                                <input type="text" id="name" name="name" required>
+                                <label for="quoteName">Contact Person*</label>
+                                <input type="text" id="quoteName" name="name" value="<?= inquiryValue('quote', 'name') ?>" required minlength="2">
                             </div>
                         </div>
                         
                         <div class="form-row">
                             <div class="form-group">
-                                <label for="email">Email*</label>
-                                <input type="email" id="email" name="email" required>
+                                <label for="quoteEmail">Email*</label>
+                                <input type="email" id="quoteEmail" name="email" value="<?= inquiryValue('quote', 'email') ?>" required>
                             </div>
                             <div class="form-group">
-                                <label for="phone">Phone*</label>
-                                <input type="tel" id="phone" name="phone" required>
+                                <label for="quotePhone">Phone*</label>
+                                <input type="tel" id="quotePhone" name="phone" value="<?= inquiryValue('quote', 'phone') ?>" required minlength="7">
                             </div>
                         </div>
                         
@@ -909,13 +954,13 @@
                             <label for="product">Product Interest*</label>
                             <select id="product" name="product" required>
                                 <option value="">Select Product</option>
-                                <option value="corrugated">Corrugated Cartons</option>
-                                <option value="honeycomb">Paper Honeycomb</option>
-                                <option value="angles">Paper Angles/Edge Protectors</option>
-                                <option value="tubes">Spiral Wound Tubes</option>
-								<option value="pallet">Pallet</option>
-                                <option value="bubblewrap">Honeycomb Bubble Wrap</option>
-                                <option value="custom">Custom Solution</option>
+                                <option value="corrugated"<?= inquirySelected('product', 'corrugated') ?>>Corrugated Cartons</option>
+                                <option value="honeycomb"<?= inquirySelected('product', 'honeycomb') ?>>Paper Honeycomb</option>
+                                <option value="angles"<?= inquirySelected('product', 'angles') ?>>Paper Angles/Edge Protectors</option>
+                                <option value="tubes"<?= inquirySelected('product', 'tubes') ?>>Spiral Wound Tubes</option>
+                                <option value="pallet"<?= inquirySelected('product', 'pallet') ?>>Pallet</option>
+                                <option value="bubblewrap"<?= inquirySelected('product', 'bubblewrap') ?>>Honeycomb Bubble Wrap</option>
+                                <option value="custom"<?= inquirySelected('product', 'custom') ?>>Custom Solution</option>
                             </select>
                         </div>
                         
@@ -924,30 +969,40 @@
                                 <label for="quantity">Estimated Monthly Quantity*</label>
                                 <select id="quantity" name="quantity" required>
                                     <option value="">Select Range</option>
-                                    <option value="1k">1,000 - 5,000 units</option>
-                                    <option value="5k">5,001 - 20,000 units</option>
-                                    <option value="20k">20,001 - 50,000 units</option>
-                                    <option value="50k">50,001 - 100,000 units</option>
-                                    <option value="100k">100,000+ units</option>
+                                    <option value="1k"<?= inquirySelected('quantity', '1k') ?>>1,000 - 5,000 units</option>
+                                    <option value="5k"<?= inquirySelected('quantity', '5k') ?>>5,001 - 20,000 units</option>
+                                    <option value="20k"<?= inquirySelected('quantity', '20k') ?>>20,001 - 50,000 units</option>
+                                    <option value="50k"<?= inquirySelected('quantity', '50k') ?>>50,001 - 100,000 units</option>
+                                    <option value="100k"<?= inquirySelected('quantity', '100k') ?>>100,000+ units</option>
                                 </select>
                             </div>
                             <div class="form-group">
                                 <label for="urgency">Urgency</label>
                                 <select id="urgency" name="urgency">
-                                    <option value="standard">Standard (5-7 days)</option>
-                                    <option value="rush">Rush (3-5 days)</option>
-                                    <option value="emergency">Emergency (1-2 days)</option>
+                                    <option value="standard"<?= inquirySelected('urgency', 'standard') ?>>Standard (5-7 days)</option>
+                                    <option value="rush"<?= inquirySelected('urgency', 'rush') ?>>Rush (3-5 days)</option>
+                                    <option value="emergency"<?= inquirySelected('urgency', 'emergency') ?>>Emergency (1-2 days)</option>
                                 </select>
                             </div>
                         </div>
                         
                         <div class="form-group">
                             <label for="specs">Special Requirements</label>
-                            <textarea id="specs" name="specs" placeholder="Dimensions, materials, printing, etc."></textarea>
+                            <textarea id="specs" name="specs" placeholder="Dimensions, materials, printing, etc."><?= inquiryValue('quote', 'specs') ?></textarea>
                         </div>
-						
+                        <div class="form-group">
+                            <label for="quoteCaptcha">Security code (CAPTCHA)*</label>
+                            <div class="captcha-controls">
+                                <img class="captcha-image" src="captcha.php?id=<?= $quoteCaptcha ?>" alt="Five-character CAPTCHA security code" width="220" height="64">
+                                <button type="button" class="captcha-refresh" hidden>New code</button>
+                                <noscript><a href="/?refresh=quote#rfq">Load a new code</a></noscript>
+                            </div>
+                            <input type="hidden" name="captcha_id" value="<?= $quoteCaptcha ?>">
+                            <input type="text" id="quoteCaptcha" name="captcha_answer" required maxlength="5" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-describedby="quoteCaptchaHelp">
+                            <small class="captcha-help" id="quoteCaptchaHelp">Enter the 5 characters shown above. Letters are not case-sensitive.</small>
+                        </div>
                         <div class="form-submit">
-                            <button type="submit" class="btn">Request Quote</button>
+                            <button type="submit" class="btn" data-default-label="Request Quote" data-submitted="<?= $quoteSubmitted ? 'true' : 'false' ?>" <?= $quoteSubmitted ? 'disabled' : '' ?>><?= $quoteSubmitted ? 'Submitted' : 'Request Quote' ?></button>
                         </div>
                     </form>
                 </div>
@@ -1025,7 +1080,8 @@
                 </div>
 
                 <div class="contact-form">
-                    <form id="contactForm"  action="send-email.php" method="POST">
+                    <form id="contactForm" action="send-email.php" method="POST" data-inquiry-form="contact">
+                        <div class="inquiry-status" role="<?= $contactSubmitted ? 'status' : 'alert' ?>" aria-live="polite" tabindex="-1" data-status="<?= ($inquiryFlash['form'] ?? '') === 'contact' ? htmlspecialchars($inquiryFlash['status'] ?? '', ENT_QUOTES, 'UTF-8') : '' ?>" <?= hexsaInquiryMessage($inquiryFlash, 'contact') === '' ? 'hidden' : '' ?>><?= hexsaInquiryMessage($inquiryFlash, 'contact') ?></div>
 					      <!-- Honeypot Field (Bots will fill this) -->
 						<div class="hidden">
 							<label for="website">Leave this empty:</label>
@@ -1033,29 +1089,40 @@
 						</div>
 						<div>
 							<label for="name">Name*:</label>
-							<input type="text" id="name" name="name" required minlength="2">
+                            <input type="text" id="name" name="name" value="<?= inquiryValue('contact', 'name') ?>" required minlength="2">
 							<span id="nameError" class="error"></span>
 						</div>
 
 						<div>
 							<label for="email">Email*:</label>
-							<input type="email" id="email" name="email" required>
+                            <input type="email" id="email" name="email" value="<?= inquiryValue('contact', 'email') ?>" required>
 							<span id="emailError" class="error"></span>
 						</div>
 						
 						<div>
 							<label for="phone">Phone Number*:</label>
-							<input type="phone" id="phone" name="phone" required minlength="10">
+                            <input type="tel" id="phone" name="phone" value="<?= inquiryValue('contact', 'phone') ?>" required minlength="10">
 							<span id="phoneError" class="error"></span>
 						</div>
 
 						<div>
 							<label for="message">Message*:</label>
-							<textarea id="message" name="message" required minlength="10"></textarea>
+                            <textarea id="message" name="message" required minlength="10"><?= inquiryValue('contact', 'message') ?></textarea>
 							<span id="messageError" class="error"></span>
 						</div>
 
-						<button type="submit" class="btn">Send Message</button>
+                        <div class="form-group">
+                            <label for="contactCaptcha">Security code (CAPTCHA)*</label>
+                            <div class="captcha-controls">
+                                <img class="captcha-image" src="captcha.php?id=<?= $contactCaptcha ?>" alt="Five-character CAPTCHA security code" width="220" height="64">
+                                <button type="button" class="captcha-refresh" hidden>New code</button>
+                                <noscript><a href="/?refresh=contact#contact">Load a new code</a></noscript>
+                            </div>
+                            <input type="hidden" name="captcha_id" value="<?= $contactCaptcha ?>">
+                            <input type="text" id="contactCaptcha" name="captcha_answer" required maxlength="5" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-describedby="contactCaptchaHelp">
+                            <small class="captcha-help" id="contactCaptchaHelp">Enter the 5 characters shown above. Letters are not case-sensitive.</small>
+                        </div>
+                        <button type="submit" class="btn" data-default-label="Send Message" data-submitted="<?= $contactSubmitted ? 'true' : 'false' ?>" <?= $contactSubmitted ? 'disabled' : '' ?>><?= $contactSubmitted ? 'Submitted' : 'Send Message' ?></button>
 						
                        <!-- <input type="text" name="name" placeholder="Your Name" required>
                         <input type="email" name="email" placeholder="Your Email" required>
@@ -1166,79 +1233,72 @@
             header.classList.toggle('sticky', window.scrollY > 0);
         });
 
-        // Form submission handling
-        document.getElementById('quoteForm').addEventListener('submit', function(e) {
-            // Form validation
-            const requiredFields = this.querySelectorAll('[required]');
-            let isValid = true;
-            
-            requiredFields.forEach(field => {
-                if (!field.value.trim()) {
-                    field.style.borderColor = 'red';
-                    isValid = false;
-                } else {
-                    field.style.borderColor = '#ddd';
+        document.querySelectorAll('[data-inquiry-form]').forEach(form => {
+            const submitButton = form.querySelector('[type="submit"]');
+            const status = form.querySelector('.inquiry-status');
+            const refreshButton = form.querySelector('.captcha-refresh');
+            refreshButton.hidden = false;
+            let sending = false;
+
+            form.addEventListener('input', () => {
+                if (submitButton.dataset.submitted === 'true') {
+                    submitButton.dataset.submitted = 'false';
+                    submitButton.textContent = submitButton.dataset.defaultLabel;
+                    submitButton.disabled = refreshButton.disabled;
+                    status.hidden = true;
                 }
             });
-            
-            if (!isValid) {
-                e.preventDefault();
-                alert('Please fill in all required fields.');
-            }
+
+            form.addEventListener('submit', event => {
+                if (sending || refreshButton.disabled || !form.reportValidity()) {
+                    event.preventDefault();
+                    return;
+                }
+                sending = true;
+                submitButton.disabled = true;
+                submitButton.textContent = 'Sending…';
+                form.setAttribute('aria-busy', 'true');
+            });
+
+            refreshButton.addEventListener('click', async () => {
+                if (sending) return;
+                refreshButton.disabled = true;
+                submitButton.disabled = true;
+                try {
+                    const response = await fetch('captcha.php?form=' + form.dataset.inquiryForm, { cache: 'no-store' });
+                    if (!response.ok) throw new Error('CAPTCHA refresh failed');
+                    const challenge = await response.json();
+                    form.elements.captcha_id.value = challenge.id;
+                    form.querySelector('.captcha-image').src = challenge.image;
+                    form.elements.captcha_answer.value = '';
+                    form.elements.captcha_answer.focus();
+                } catch {
+                    status.textContent = 'We could not refresh the security code. Please try again.';
+                    status.dataset.status = 'error';
+                    status.setAttribute('role', 'alert');
+                    status.hidden = false;
+                } finally {
+                    refreshButton.disabled = false;
+                    submitButton.disabled = submitButton.dataset.submitted === 'true';
+                }
+            });
+
+            window.addEventListener('pageshow', () => {
+                sending = false;
+                form.removeAttribute('aria-busy');
+                submitButton.disabled = submitButton.dataset.submitted === 'true';
+                submitButton.textContent = submitButton.disabled ? 'Submitted' : submitButton.dataset.defaultLabel;
+            });
+
+            if (!status.hidden) status.focus({ preventScroll: true });
         });
 
-		const inquiryStatus = new URLSearchParams(window.location.search).get('inquiry');
-		if (inquiryStatus === 'sent') {
-			alert('Thank you. Your inquiry has been sent successfully.');
-		} else if (inquiryStatus === 'invalid') {
-			alert('Please check the required details and submit the form again.');
-		} else if (inquiryStatus === 'rate-limited') {
-			alert('Please wait a few seconds before sending another inquiry.');
-		} else if (inquiryStatus === 'error') {
-			alert('We could not send your inquiry right now. Please try again shortly.');
-		}
-
-		if (inquiryStatus) {
-			window.history.replaceState({}, document.title, window.location.pathname + window.location.hash);
-		}
-		
-		
-		document.getElementById('contactForm').addEventListener('submit', function(e) 
-		{
-            let isValid = true;
-            
-         /*   // Clear previous errors
-            document.querySelectorAll('.error').forEach(el => el.textContent = '');
-
-            // Honeypot check (if filled, likely spam)
-            if (document.getElementById('website').value) {
-                alert('Spam detected!');
-                isValid = false;
-            }
-
-            // Name validation
-            if (!document.getElementById('name').value.trim()) {
-                document.getElementById('nameError').textContent = 'Name is required';
-                isValid = false;
-            }
-
-            // Email validation
-            const email = document.getElementById('email').value;
-            if (!email.includes('@') || !email.includes('.')) {
-                document.getElementById('emailError').textContent = 'Invalid email';
-                isValid = false;
-            }
-			
-		/*	const phone = document.getElementById('phone').value;
-			const cleanedPhone = phone.replace(/\D/g, '');
-			if (phone.length < 10) 
-			{
-				document.getElementById('phoneError').textContent =  'Invalid phone number (must be at least 10 digits)';
-				isValid = false;
-			}
-
-            if (!isValid) e.preventDefault(); // Stop form submission
-        });
+        const inquiryUrl = new URL(window.location.href);
+        if (inquiryUrl.searchParams.has('inquiry')) {
+            inquiryUrl.searchParams.delete('inquiry');
+            inquiryUrl.searchParams.delete('form');
+            window.history.replaceState({}, document.title, inquiryUrl.pathname + inquiryUrl.search + inquiryUrl.hash);
+        }
     </script>
 </body>
 </html>

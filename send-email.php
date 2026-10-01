@@ -3,10 +3,21 @@ declare(strict_types=1);
 
 const HEXSA_INQUIRY_RECIPIENT = 'marketing.hexsa@gmail.com';
 
+require_once __DIR__ . '/inquiry-protection.php';
+
 function redirectToForm(string $status, string $form): never
 {
+    $values = [];
+    if ($status !== 'sent') {
+        foreach (['company', 'name', 'email', 'phone', 'product', 'quantity', 'urgency', 'specs', 'message'] as $field) {
+            if (is_string($_POST[$field] ?? null)) {
+                $values[$field] = mb_substr($_POST[$field], 0, 3000);
+            }
+        }
+    }
+    hexsaSetInquiryFlash($status, $form, $values);
     $anchor = $form === 'quote' ? 'rfq' : 'contact';
-    header('Location: https://hexsa.in/?inquiry=' . rawurlencode($status) . '&form=' . rawurlencode($form) . '#' . $anchor);
+    header('Location: /?inquiry=' . rawurlencode($status) . '&form=' . rawurlencode($form) . '#' . $anchor, true, 303);
     exit;
 }
 
@@ -32,13 +43,13 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 $isQuote = array_key_exists('company', $_POST);
 $form = $isQuote ? 'quote' : 'contact';
+hexsaStartSession();
 
-// Keep automated submissions out without relying on an external CAPTCHA service.
+// The hidden field supplements the visible, server-validated CAPTCHA.
 if (!empty($_POST['website'])) {
-    redirectToForm('sent', $form);
+    redirectToForm('invalid', $form);
 }
 
-session_start();
 $now = time();
 $lastSubmission = (int) ($_SESSION['hexsa_last_inquiry'] ?? 0);
 if ($lastSubmission > 0 && ($now - $lastSubmission) < 15) {
@@ -62,6 +73,10 @@ $validContact = $isQuote || mb_strlen($customerMessage) >= 10;
 
 if (!$validCommonFields || !$validQuote || !$validContact) {
     redirectToForm('invalid', $form);
+}
+
+if (!hexsaValidateCaptcha($form, $_POST['captcha_id'] ?? null, $_POST['captcha_answer'] ?? null)) {
+    redirectToForm('captcha', $form);
 }
 
 $safeName = escapeHtml($name);
