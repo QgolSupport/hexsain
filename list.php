@@ -1,4 +1,8 @@
 <?php
+// Retired server-control and filesystem-download endpoints are not part of this website.
+http_response_code(404);
+exit;
+
 $directory = "C:/xampp/htdocs/files"; // Directory path
 $image_extensions = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'xlsx']; // Allowed extensions
 
@@ -70,7 +74,11 @@ $files = findFiles($directory);
 <div class="container">
     <h1>Files</h1>
     <div class="file-list">
-        <?php if (!empty($files)) {
+        <?php
+// Retired server-control and filesystem-download endpoints are not part of this website.
+http_response_code(404);
+exit;
+ if (!empty($files)) {
             foreach ($files as $file) {
                 $relativePath = str_replace($directory . '/', '', $file); // Relative path
                 echo "<div class='file-item'>";

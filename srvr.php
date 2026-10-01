@@ -1,4 +1,8 @@
 <?php
+// Retired server-control and filesystem-download endpoints are not part of this website.
+http_response_code(404);
+exit;
+
 $remoteServerIp = '35.154.190.213';
 $remoteUsername = 'Qtlive';
 $remotePassword = '1Qt_entry';
