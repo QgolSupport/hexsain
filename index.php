@@ -126,7 +126,10 @@ function inquirySelected(string $field, string $value): string
         }
 
         .logo img {
-            height: 50px;
+            width: 64px;
+            height: 64px;
+            flex-shrink: 0;
+            object-fit: contain;
             margin-right: 10px;
         }
 
@@ -703,7 +706,7 @@ function inquirySelected(string $field, string $value): string
     <header>
         <div class="container header-container">
             <div class="logo">
-                <img src="Images/logo.jpg" alt="Safe Corrugated Containers Logo">
+                <img src="Images/hexsa-logo.png" width="1254" height="1254" alt="HEXSA — Safe Corrugated Containers">
                 <div class="logo-text">
                     Safe Corrugated Containers Pvt. Ltd.
                     <span>Sustainable Packaging Since 1992</span>
